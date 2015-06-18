@@ -22,10 +22,12 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								tx.executeSql(query, values, function(tx, results) {
 									deferred.resolve(results);
 								}, function(tx, e){
-									console.log("There has been an error: " + e.message);
-									deferred.reject();
+									console.log("There has been an error: " + e.message, tx, query, values);
+									deferred.reject(e);
 								});
 							});
+
+							// console.log(query);
 							return deferred.promise;
 						},
 						insert: function(c, e, r) {
@@ -80,6 +82,17 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								"{tableName}": b,
 								"{where}": a.w
 							}), a.p);
+						},
+						join: function(what, from, where, join, on) {
+							var query = "SELECT {what} FROM `{from}` JOIN `{join}` ON {on} WHERE {where};";
+							var where = this.whereClause(where);
+							return this.executeQuery(this.replace(query, {
+								"{what}": what,
+								"{from}": from,
+								"{where}": where.w,
+								"{join}": join,
+								"{on}": on
+							}), where.p)
 						},
 						selectAll: function(a) {
 							return this.executeQuery("SELECT * FROM `" + a + "`; ", []);
