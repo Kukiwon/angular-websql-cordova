@@ -10,11 +10,15 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 		return {
 			openDatabase: function(options) {
 				try {
-					if (typeof(window.sqlitePlugin.openDatabase) === "undefined")
-						throw "Browser does not support cordova web sql";
-					
-					var db = window.sqlitePlugin.openDatabase(options);
-					
+					var db;
+					if(options.native) {
+						db = window.openDatabase(options.name, 1.0, options.name, 1000000);
+					} else {
+						if (typeof(window.sqlitePlugin.openDatabase) === "undefined")
+							throw "Browser does not support cordova web sql";
+						db = window.sqlitePlugin.openDatabase(options);
+					}
+
 					return {
 						executeQuery: function(query, values) {
 							var deferred = $q.defer();
@@ -27,7 +31,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								});
 							});
 
-							// console.log(query);
+							//console.log(query);
 							return deferred.promise;
 						},
 						insert: function(c, e, r) {
