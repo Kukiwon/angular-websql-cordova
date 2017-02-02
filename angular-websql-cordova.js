@@ -4,34 +4,84 @@
  * © MIT License
  * @version 1.0.2
  */
+/**
+ * angular-websql
+ * Helps you generate and run websql queries with angular services.
+ * © MIT License
+ * @version 1.0.2
+ */
 "use strict";
 angular.module("angular-websql", []).factory("$webSql", ["$q",
 	function($q) {
 		return {
-			openDatabase: function(options) {
+			openDatabase: function(dbName, version, desc, size) {
 				try {
 					var db;
-					if(options.native) {
-						db = window.openDatabase(options.name, 1.0, options.name, 1000000);
+					if((window.sqlitePlugin) === 'undefined') {
+						db = window.openDatabase(dbName, version, desc, size);
 					} else {
 						if (typeof(window.sqlitePlugin.openDatabase) === "undefined")
 							throw "Browser does not support cordova web sql";
-						db = window.sqlitePlugin.openDatabase(options);
+						db = window.sqlitePlugin.openDatabase({
+							name: dbName, 
+							location: 1, 
+							androidDatabaseImplementation: 2});
 					}
 
+					// Register chunk method on array.
+					Array.prototype.chunk = function ( n ) {
+					    if ( !this.length ) {
+					        return [];
+					    }
+					    return [ this.slice( 0, n ) ].concat( this.slice(n).chunk(n) );
+					};
+
+
+					if (typeof(openDatabase) == "undefined")
+						throw "Browser does not support web sql";
 					return {
 						executeQuery: function(query, values) {
-							var deferred = $q.defer();
+                            var deferred = $q.defer();
 							db.transaction(function(tx) {
 								tx.executeSql(query, values, function(tx, results) {
 									deferred.resolve(results);
 								}, function(tx, e){
-									console.log("There has been an error: " + e.message, tx, query, values);
-									deferred.reject(e);
+									console.log("There has been an error: " + e.message);
+									deferred.reject();
 								});
 							});
+							return deferred.promise;
+						},
+						executeQueriesBatch: function(queriesAndValues) {
+							var deferred = $q.defer();
 
-							//console.log(query);
+							db.sqlBatch(queriesAndValues, function() {
+								deferred.resolve();	
+							}, function(e) {
+								console.log("There has been an error: " + e.message);
+								deferred.reject();
+							})
+
+							return deferred.promise;
+						},
+						executeQueries: function(queries, values) {
+                            var deferred = $q.defer();
+                            db.transaction(function(tx) {
+								for(var idx = 0; idx < queries.length; ++idx) {
+                                    tx.executeSql(queries[idx], values[idx], function(tx, results) {
+                                    }, function(tx, e){
+                                        console.log("There has been an error: " + e.message);
+                                        deferred.reject();
+                                    });
+                                }
+							},
+                            function(tx, err) {
+                                console.log("There has been an error: " + err);
+                                deferred.reject();
+                            },
+                            function(tx, err) {
+                                deferred.resolve(err);
+                            });
 							return deferred.promise;
 						},
 						insert: function(c, e, r) {
@@ -50,6 +100,115 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								"{fields}": a,
 								"{values}": b
 							}), v);
+						},
+						bulkInsert: function(table, objects, r) { 
+                            var deferred = $q.defer();
+                            var self = this;
+                            if(!(objects instanceof Array)) {
+                                return this.insert(table, objects, r)
+                            } else if(typeof objects === 'undefined' || objects.length <= 0) {
+                                deferred.reject();
+                            } else {
+                                var query = (typeof r === "boolean" && r) ? "INSERT OR REPLACE" : "INSERT";
+                                query += " INTO `{tableName}` ({fields}) VALUES({values});";
+                                db.transaction(function(tx) {
+                                    for (var idx in objects) {
+                                        var object = objects[idx]
+                                        var a = "",
+                                        b = "",
+                                        values = [];
+                                        for (var d in object) {
+                                            a += (Object.keys(object)[Object.keys(object).length - 1] == d) ? "`" + d + "`" : "`" + d + "`, ";
+                                            b += (Object.keys(object)[Object.keys(object).length - 1] == d) ? "?" : "?, ";
+                                            values.push(object[d]);
+                                        }
+                                        query = self.replace(query, {
+                                            "{tableName}": table,
+                                            "{fields}": a,
+                                            "{values}": b
+                                        })
+                                        tx.executeSql(query, values, function(tx, results) {
+                                        }, function(tx, e){
+                                            console.log("There has been an error: " + e.message);
+                                            deferred.reject();
+                                        });
+                                    }
+                                },
+                                function(tx, err) {
+                                    console.log("There has been an error: " + err);
+                                    deferred.reject();
+                                },
+                                function(tx, res) {
+                                    deferred.resolve(res);
+                                });
+                            }
+                            return deferred.promise;                            
+						},
+						batchInsert: function(table, objects, r, batchSize) {
+							var deferred = $q.defer();
+							var self = this;
+							if(!(objects instanceof Array)) {
+							    return this.insert(table, objects, r)
+							} else if(typeof objects === 'undefined' || objects.length <= 0) {
+							    deferred.reject();
+							} else {
+							    var query = (typeof r === "boolean" && r) ? "INSERT OR REPLACE" : "INSERT";
+							    query += " INTO `{tableName}` ({fields}) VALUES({values});";
+							    
+							    var queryValuePairs = [];
+							    for (var idx in objects) {
+							        var object = objects[idx]
+							        var a = "",
+							        b = "",
+							        values = [];
+							        for (var d in object) {
+							            a += (Object.keys(object)[Object.keys(object).length - 1] == d) ? "`" + d + "`" : "`" + d + "`, ";
+							            b += (Object.keys(object)[Object.keys(object).length - 1] == d) ? "?" : "?, ";
+							            values.push(object[d]);
+							        }
+							        query = self.replace(query, {
+							            "{tableName}": table,
+							            "{fields}": a,
+							            "{values}": b
+							        })
+							        queryValuePairs.push([query, values])
+							    }
+
+							    var chunksToDo = [];
+							    var taskForChunk = function() {
+							    	var defer = $q.defer();
+							    	var chunk = chunksToDo.pop()
+							    	if (!chunk) { 
+							    		defer.resolve();
+							    		return
+							    	}
+							    	self.executeQueriesBatch(chunk)
+							    	.then(function() {
+							    		console.log('performed ' + batchSize, chunksToDo.length + ' remaining');
+							    		defer.resolve();
+							    	})
+							    	.catch(function(e) {
+							    		defer.reject(e);
+							    	})
+							    	return defer.promise;
+							    }
+
+							    if (queryValuePairs.length > 0) {
+							    	if(batchSize && batchSize > 1 && batchSize < queryValuePairs.length) {
+							    		var chunksToDo = queryValuePairs.chunk(batchSize)
+							    		var tasks = chunksToDo.map(function(chunk) {
+							    			return taskForChunk
+							    		});
+							    		console.log('performing ' + tasks.length + ' serial insert tasks of batch size: ' + batchSize);
+							    		return $q.serial(tasks);
+							    	} else {
+							    		return this.executeQueriesBatch(queryValuePairs);
+							    	}
+							    } else {
+							    	deferred.resolve([]);
+							    }
+							}
+							return deferred.promise;   
 						},
 						update: function(b, g, c) {
 							var f = "UPDATE `{tableName}` SET {update} WHERE {where}; ";
@@ -87,19 +246,50 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								"{where}": a.w
 							}), a.p);
 						},
-						join: function(what, from, where, join, on) {
-							var query = "SELECT {what} FROM `{from}` JOIN `{join}` ON {on} WHERE {where};";
-							var where = this.whereClause(where);
-							return this.executeQuery(this.replace(query, {
-								"{what}": what,
-								"{from}": from,
-								"{where}": where.w,
-								"{join}": join,
-								"{on}": on
-							}), where.p)
+						selectLimit: function(table, where, limit) {
+							var d = "SELECT * FROM `{tableName}` WHERE {where} LIMIT {limit}; ";
+							var a = this.whereClause(where);
+                            if (isNaN(limit))
+                            {
+                                throw "Limit must be a number.";
+                            }
+							return this.executeQuery(this.replace(d, {
+								"{tableName}": table,
+								"{where}": a.w,
+                                "{limit}": limit
+							}), a.p);
 						},
-						selectAll: function(a) {
-							return this.executeQuery("SELECT * FROM `" + a + "`; ", []);
+						selectAll: function(table, options) {
+                            var query = "SELECT * FROM `{tableName}` ";
+                            var extras = ""
+                            if( typeof options !== "undefined" && options.length > 0) {
+                            	query += " {extras} ";
+                            	for (var sidx in options) {
+                            		extras += " "+options[sidx].operator+" ";
+	                                for(var idx in options[sidx].columns) {
+	                                    extras += "`"+options[sidx].columns[idx] + "`,";
+	                                }
+	                                extras = extras.substring(0, extras.length - 1)+" ";
+	                                if( typeof options[sidx].postOperator !== "undefined"){
+	                                	query += options[sidx].postOperator+" ";
+	                                }
+                            	}
+                                query += ";";
+                            }
+                            return this.executeQuery(this.replace(query, {
+								"{tableName}": table,
+								"{extras}": extras
+							}), []);
+						},
+						selectAllLimit: function(table, limit) {
+                            if (isNaN(limit))
+                            {
+                                throw "Limit must be a number.";
+                            }
+							return this.executeQuery("SELECT * FROM `" + table + "` LIMIT " + limit + "; ", []);
+						},
+						selectOne: function(table) {
+							return this.selectAllLimit(table,1);
 						},
 						whereClause: function(b) {
 							var a = "",
@@ -132,6 +322,46 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							}
 							return a;
 						},
+                        addColumns: function(tableName, newColumns) {
+                            var queries = [];
+                            var values = [];
+                            for(var e in newColumns) {
+                                var b = "ALTER TABLE `{tableName}` ADD COLUMN {fields}; ";
+                                var l = "{type} {null}";
+                                var c = [];
+                                var a = "`" + e + "` ";
+                                if(typeof newColumns[e]["null"]==="undefined") newColumns[e]["null"]="NULL";
+								for (var k in newColumns[e]) {
+									l = l.replace(new RegExp("{" + k + "}", "ig"), newColumns[e][k])
+								}
+                                a += l;
+								if (typeof newColumns[e]["default"] !== "undefined") {
+									a += " DEFAULT " + newColumns[e]["default"]
+								}
+								if (typeof newColumns[e]["primary"] !== "undefined") {
+									a += " PRIMARY KEY"
+								}
+								if (typeof newColumns[e]["auto_increment"] !== "undefined") {
+									a += " AUTOINCREMENT"
+								}
+								if (Object.keys(newColumns)[Object.keys(newColumns).length - 1] != e) {
+									a += ","
+								}
+								if (typeof newColumns[e]["primary"] !== "undefined" && newColumns[e]["primary"]) {
+									c.push(e)
+								}                                
+                                var d = {
+                                    tableName: tableName,
+                                    fields: a
+                                };
+                                for (var f in d) {
+                                    b = b.replace(new RegExp("{" + f + "}", "ig"), d[f])
+                                }
+                                queries.push(b);
+                                values.push([]);
+                            }                            
+                            return this.executeQueries(queries, values);                            
+                        },
 						createTable: function(j, g) {
 							var b = "CREATE TABLE IF NOT EXISTS `{tableName}` ({fields}); ";
 							var c = [];
@@ -169,6 +399,33 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							}
 							return this.executeQuery(b, []);
 						},
+                        createOrAlterTable: function(tableName, iColumns) {
+							var self = this;
+                            return self.select("sqlite_master", {
+                                "type": {
+                                    "value": 'table',
+                                    "union": 'AND'
+                                },
+                                "tbl_name": tableName
+                            }).then(function(results) {
+                                if(results.rows.length <= 0) {
+                                    return self.createTable(tableName, iColumns)
+                                } else {
+                                    for(var i=0; i < results.rows.length; ++i) {
+                                        var sql = results.rows.item(i).sql
+                                        var regexp = new RegExp("`[^`]+`", "ig")
+                                        var currentColumns = sql.replace(/(CREATE TABLE `.*` \(|\))/gi, "").match(regexp)                                        
+                                        var newColumns = {};
+                                        for(var newColIdx in iColumns) {                                            
+                                            if(currentColumns.indexOf("`" + newColIdx + "`") == -1) {
+                                                newColumns[newColIdx] = iColumns[newColIdx];
+                                            }
+                                        }
+                                        return self.addColumns(tableName, newColumns)                                    
+                                    }
+                                }
+                            })
+                        },
 						dropTable: function(a) {
 							return this.executeQuery("DROP TABLE IF EXISTS `" + a + "`; ", []);
 						},
