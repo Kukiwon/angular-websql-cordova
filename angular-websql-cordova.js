@@ -41,6 +41,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 						throw "Browser does not support web sql";
 					return {
 						executeQuery: function(query, values) {
+							console.log(query, values);
                             var deferred = $q.defer();
 							db.transaction(function(tx) {
 								tx.executeSql(query, values, function(tx, results) {
@@ -53,6 +54,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							return deferred.promise;
 						},
 						executeQueriesBatch: function(queriesAndValues) {
+							console.log(queriesAndValues);
 							var deferred = $q.defer();
 
 							db.sqlBatch(queriesAndValues, function() {
@@ -171,7 +173,9 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							            "{fields}": a,
 							            "{values}": b
 							        })
-							        queryValuePairs.push([query, values])
+							        if(values.length > 0) {
+							        	queryValuePairs.push([query, values])
+							        }
 							    }
 
 							    var chunksToDo = [];
