@@ -23,8 +23,8 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 						if (typeof(window.sqlitePlugin.openDatabase) === "undefined")
 							throw "Browser does not support cordova web sql";
 						db = window.sqlitePlugin.openDatabase({
-							name: dbName, 
-							location: 1, 
+							name: dbName,
+							location: 1,
 							androidDatabaseImplementation: 2});
 					}
 
@@ -41,7 +41,6 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 						throw "Browser does not support web sql";
 					return {
 						executeQuery: function(query, values) {
-							console.log(query, values);
                             var deferred = $q.defer();
 							db.transaction(function(tx) {
 								tx.executeSql(query, values, function(tx, results) {
@@ -54,11 +53,10 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							return deferred.promise;
 						},
 						executeQueriesBatch: function(queriesAndValues) {
-							console.log(queriesAndValues);
 							var deferred = $q.defer();
 
 							db.sqlBatch(queriesAndValues, function() {
-								deferred.resolve();	
+								deferred.resolve();
 							}, function(e) {
 								console.log("There has been an error: " + e.message);
 								deferred.reject();
@@ -103,7 +101,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								"{values}": b
 							}), v);
 						},
-						bulkInsert: function(table, objects, r) { 
+						bulkInsert: function(table, objects, r) {
                             var deferred = $q.defer();
                             var self = this;
                             if(!(objects instanceof Array)) {
@@ -144,7 +142,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
                                     deferred.resolve(res);
                                 });
                             }
-                            return deferred.promise;                            
+                            return deferred.promise;
 						},
 						batchInsert: function(table, objects, r, batchSize) {
 							var deferred = $q.defer();
@@ -156,7 +154,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							} else {
 							    var query = (typeof r === "boolean" && r) ? "INSERT OR REPLACE" : "INSERT";
 							    query += " INTO `{tableName}` ({fields}) VALUES({values});";
-							    
+
 							    var queryValuePairs = [];
 							    for (var idx in objects) {
 							        var object = objects[idx]
@@ -182,13 +180,12 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							    var taskForChunk = function() {
 							    	var defer = $q.defer();
 							    	var chunk = chunksToDo.pop()
-							    	if (!chunk) { 
+							    	if (!chunk) {
 							    		defer.resolve();
 							    		return
 							    	}
 							    	self.executeQueriesBatch(chunk)
 							    	.then(function() {
-							    		console.log('performed ' + batchSize, chunksToDo.length + ' remaining');
 							    		defer.resolve();
 							    	})
 							    	.catch(function(e) {
@@ -203,7 +200,6 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							    		var tasks = chunksToDo.map(function(chunk) {
 							    			return taskForChunk
 							    		});
-							    		console.log('performing ' + tasks.length + ' serial insert tasks of batch size: ' + batchSize);
 							    		return $q.serial(tasks);
 							    	} else {
 							    		return this.executeQueriesBatch(queryValuePairs);
@@ -212,7 +208,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 							    	deferred.resolve([]);
 							    }
 							}
-							return deferred.promise;   
+							return deferred.promise;
 						},
 						update: function(b, g, c) {
 							var f = "UPDATE `{tableName}` SET {update} WHERE {where}; ";
@@ -302,20 +298,20 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								if(typeof b[c] !== "undefined" && typeof b[c] !== "object" && typeof b[c] === "string" && !b[c].match(/NULL/ig)) v.push(b[c]);
 								else if(typeof b[c] !== "undefined" && typeof b[c] !== "object" && typeof b[c] === "number") v.push(b[c]);
 								else if(typeof b[c]["value"] !== "undefined" && typeof b[c] === "object" && (typeof b[c]["value"] === "number" || !b[c]["value"].match(/NULL/ig))) v.push(b[c]["value"]);
-								a += (typeof b[c] === "object") ? 
-												(typeof b[c]["union"] === "undefined") ? 
-													(typeof b[c]["value"] === "string" && b[c]["value"].match(/NULL/ig)) ? 
-														"`" + c + "` " + b[c]["value"] : 
+								a += (typeof b[c] === "object") ?
+												(typeof b[c]["union"] === "undefined") ?
+													(typeof b[c]["value"] === "string" && b[c]["value"].match(/NULL/ig)) ?
+														"`" + c + "` " + b[c]["value"] :
 														(typeof b[c]["operator"] !== "undefined")?
-															"`" + c + "` " + b[c]["operator"] + " ? " : 
-															"`" + c + "` = ?" : 
-													(typeof b[c]["value"] === "string" && b[c]["value"].match(/NULL/ig)) ? 
-															"`" + c + "` " + b[c]["value"] + " " + b[c]["union"] + " " : 
-															(typeof b[c]["operator"] !== "undefined") ? 
-																"`" + c + "` " + b[c]["operator"] + " ? " + b[c]["union"] + " " : 
-																"`" + c + "` = ? " + b[c]["union"] + " " : 
-												(typeof b[c] === "string" && b[c].match(/NULL/ig)) ? 
-													"`" + c + "` " + b[c] : 
+															"`" + c + "` " + b[c]["operator"] + " ? " :
+															"`" + c + "` = ?" :
+													(typeof b[c]["value"] === "string" && b[c]["value"].match(/NULL/ig)) ?
+															"`" + c + "` " + b[c]["value"] + " " + b[c]["union"] + " " :
+															(typeof b[c]["operator"] !== "undefined") ?
+																"`" + c + "` " + b[c]["operator"] + " ? " + b[c]["union"] + " " :
+																"`" + c + "` = ? " + b[c]["union"] + " " :
+												(typeof b[c] === "string" && b[c].match(/NULL/ig)) ?
+													"`" + c + "` " + b[c] :
 													"`" + c + "` = ?"
 							}
 							return {w:a,p:v};
@@ -353,7 +349,7 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
 								}
 								if (typeof newColumns[e]["primary"] !== "undefined" && newColumns[e]["primary"]) {
 									c.push(e)
-								}                                
+								}
                                 var d = {
                                     tableName: tableName,
                                     fields: a
@@ -363,8 +359,8 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
                                 }
                                 queries.push(b);
                                 values.push([]);
-                            }                            
-                            return this.executeQueries(queries, values);                            
+                            }
+                            return this.executeQueries(queries, values);
                         },
 						createTable: function(j, g) {
 							var b = "CREATE TABLE IF NOT EXISTS `{tableName}` ({fields}); ";
@@ -418,14 +414,14 @@ angular.module("angular-websql", []).factory("$webSql", ["$q",
                                     for(var i=0; i < results.rows.length; ++i) {
                                         var sql = results.rows.item(i).sql
                                         var regexp = new RegExp("`[^`]+`", "ig")
-                                        var currentColumns = sql.replace(/(CREATE TABLE `.*` \(|\))/gi, "").match(regexp)                                        
+                                        var currentColumns = sql.replace(/(CREATE TABLE `.*` \(|\))/gi, "").match(regexp)
                                         var newColumns = {};
-                                        for(var newColIdx in iColumns) {                                            
+                                        for(var newColIdx in iColumns) {
                                             if(currentColumns.indexOf("`" + newColIdx + "`") == -1) {
                                                 newColumns[newColIdx] = iColumns[newColIdx];
                                             }
                                         }
-                                        return self.addColumns(tableName, newColumns)                                    
+                                        return self.addColumns(tableName, newColumns)
                                     }
                                 }
                             })
