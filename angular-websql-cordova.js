@@ -11,7 +11,7 @@
  * @version 1.0.2
  */
 "use strict";
-angular.module("angular-websql", []).factory("$webSql", ["$q",
+angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
 	function($q) {
 		return {
 			openDatabase: function(dbName, version, desc, size) {
