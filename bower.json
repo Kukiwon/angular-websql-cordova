@@ -1,6 +1,6 @@
 {
   "name": "angular-websql-cordova",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Helps you generating websql simple queries without writing any sql code.",
   "author": "Paulo Caldeira, Jordy van Kuijk",
   "main": "./angular-websql-cordova.js",
