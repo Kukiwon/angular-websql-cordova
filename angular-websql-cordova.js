@@ -47,7 +47,7 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
 									deferred.resolve(results);
 								}, function(tx, e){
 									console.log("There has been an error: " + e.message);
-									deferred.reject();
+									deferred.reject(e);
 								});
 							});
 							return deferred.promise;
@@ -59,7 +59,7 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
 								deferred.resolve();
 							}, function(e) {
 								console.log("There has been an error: " + e.message);
-								deferred.reject();
+								deferred.reject(e);
 							})
 
 							return deferred.promise;
@@ -71,13 +71,13 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
                                     tx.executeSql(queries[idx], values[idx], function(tx, results) {
                                     }, function(tx, e){
                                         console.log("There has been an error: " + e.message);
-                                        deferred.reject();
+                                        deferred.reject(e);
                                     });
                                 }
 							},
                             function(tx, err) {
                                 console.log("There has been an error: " + err);
-                                deferred.reject();
+                                deferred.reject(err);
                             },
                             function(tx, err) {
                                 deferred.resolve(err);
@@ -107,7 +107,7 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
                             if(!(objects instanceof Array)) {
                                 return this.insert(table, objects, r)
                             } else if(typeof objects === 'undefined' || objects.length <= 0) {
-                                deferred.reject();
+                                deferred.reject(new Error('No objects specified'));
                             } else {
                                 var query = (typeof r === "boolean" && r) ? "INSERT OR REPLACE" : "INSERT";
                                 query += " INTO `{tableName}` ({fields}) VALUES({values});";
@@ -130,13 +130,13 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
                                         tx.executeSql(query, values, function(tx, results) {
                                         }, function(tx, e){
                                             console.log("There has been an error: " + e.message);
-                                            deferred.reject();
+                                            deferred.reject(err);
                                         });
                                     }
                                 },
                                 function(tx, err) {
                                     console.log("There has been an error: " + err);
-                                    deferred.reject();
+                                    deferred.reject(err);
                                 },
                                 function(tx, res) {
                                     deferred.resolve(res);
@@ -150,7 +150,7 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
 							if(!(objects instanceof Array)) {
 							    return this.insert(table, objects, r)
 							} else if(typeof objects === 'undefined' || objects.length <= 0) {
-							    deferred.reject();
+							    deferred.reject(new Error('No objects specified'));
 							} else {
 							    var query = (typeof r === "boolean" && r) ? "INSERT OR REPLACE" : "INSERT";
 							    query += " INTO `{tableName}` ({fields}) VALUES({values});";
