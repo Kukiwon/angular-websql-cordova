@@ -18,6 +18,8 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
 				try {
 					var db;
 					if((window.sqlitePlugin) === 'undefined') {
+						if (typeof(openDatabase) == "undefined")
+							throw "Browser does not support web sql";
 						db = window.openDatabase(dbName, version, desc, size);
 					} else {
 						if (typeof(window.sqlitePlugin.openDatabase) === "undefined")
@@ -36,9 +38,6 @@ angular.module("angular-websql-cordova", []).factory("$webSql", ["$q",
 					    return [ this.slice( 0, n ) ].concat( this.slice(n).chunk(n) );
 					};
 
-
-					if (typeof(openDatabase) == "undefined")
-						throw "Browser does not support web sql";
 					return {
 						executeQuery: function(query, values) {
                             var deferred = $q.defer();
